@@ -139,6 +139,13 @@ function App() {
     return rows
   }, [data])
 
+  const [view, setView] = useState('DASHBOARD'); // 'DASHBOARD' or 'CREDITS'
+  const [creditUsage, setCreditUsage] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/credits').then(r => r.json()).then(d => setCreditUsage(d.total_used)).catch(console.error);
+  }, []);
+
   return (
     <div className="page">
       <header className="header">
@@ -146,193 +153,272 @@ function App() {
           <div className="title">AWS Billing Dashboard</div>
           <div className="subtitle">Powered by Cost Explorer ({metricKey})</div>
         </div>
-        <div className="actions">
+        <div className="actions" style={{ gap: '10px' }}>
+          <div className="tabs" style={{ display: 'flex', background: '#e9ecef', borderRadius: '4px', padding: '2px' }}>
+            <button
+              style={{ background: view === 'DASHBOARD' ? '#fff' : 'transparent', border: 'none', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
+              onClick={() => setView('DASHBOARD')}>
+              Dashboard
+            </button>
+            <button
+              style={{ background: view === 'CREDITS' ? '#fff' : 'transparent', border: 'none', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
+              onClick={() => setView('CREDITS')}>
+              Credits
+            </button>
+          </div>
           <button className="primary" onClick={fetchCosts} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
       </header>
 
-      <section className="presets" style={{ display: 'flex', gap: '8px', padding: '0 20px', marginBottom: '10px' }}>
-        <button onClick={() => {
-          const now = new Date();
-          const yest = new Date(now); yest.setDate(yest.getDate() - 1);
-          setStart(isoDate(yest));
-          setEnd(isoDate(now));
-          setGranularity('DAILY');
-        }}>Yesterday</button>
+      {view === 'CREDITS' ? (
+        <CreditsView used={creditUsage} />
+      ) : (
+        <>
+          <section className="presets" style={{ display: 'flex', gap: '8px', padding: '0 20px', marginBottom: '10px' }}>
+            <button onClick={() => {
+              const now = new Date();
+              const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+              setStart(isoDate(yest));
+              setEnd(isoDate(now));
+              setGranularity('DAILY');
+            }}>Yesterday</button>
 
-        <button onClick={() => {
-          const now = new Date();
-          const last7 = new Date(now); last7.setDate(last7.getDate() - 7);
-          setStart(isoDate(last7));
-          setEnd(isoDate(now));
-          setGranularity('DAILY');
-        }}>Last 7 Days</button>
+            <button onClick={() => {
+              const now = new Date();
+              const last7 = new Date(now); last7.setDate(last7.getDate() - 7);
+              setStart(isoDate(last7));
+              setEnd(isoDate(now));
+              setGranularity('DAILY');
+            }}>Last 7 Days</button>
 
-        <button onClick={() => {
-          const now = new Date();
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          setStart(isoDate(startOfMonth));
-          setEnd(isoDate(now));
-          setGranularity('MONTHLY');
-        }}>This Month</button>
+            <button onClick={() => {
+              const now = new Date();
+              const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+              setStart(isoDate(startOfMonth));
+              setEnd(isoDate(now));
+              setGranularity('MONTHLY');
+            }}>This Month</button>
 
-        <button onClick={() => {
-          const now = new Date();
-          const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          setStart(isoDate(startOfLastMonth));
-          setEnd(isoDate(startOfThisMonth));
-          setGranularity('MONTHLY');
-        }}>Last Month</button>
-      </section>
+            <button onClick={() => {
+              const now = new Date();
+              const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+              const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+              setStart(isoDate(startOfLastMonth));
+              setEnd(isoDate(startOfThisMonth));
+              setGranularity('MONTHLY');
+            }}>Last Month</button>
+          </section>
 
-      <section className="panel">
-        <div className="controls">
-          <label className="field">
-            <div className="label">Start (YYYY-MM-DD)</div>
-            <input value={start} onChange={(e) => setStart(e.target.value)} />
-          </label>
-          <label className="field">
-            <div className="label">End (exclusive)</div>
-            <input value={end} onChange={(e) => setEnd(e.target.value)} />
-          </label>
-          <label className="field">
-            <div className="label">Granularity</div>
-            <select value={granularity} onChange={(e) => setGranularity(e.target.value)}>
-              <option value="DAILY">DAILY</option>
-              <option value="MONTHLY">MONTHLY</option>
-            </select>
-          </label>
-          <label className="field">
-            <div className="label">Group by</div>
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-              <option value="SERVICE">SERVICE</option>
-              <option value="NONE">NONE</option>
-            </select>
-          </label>
-          <label className="field">
-            <div className="label">Metric</div>
-            <select value={metricKey} onChange={(e) => setMetricKey(e.target.value)}>
-              <option value="unblended">Unblended Cost</option>
-              <option value="amortized">Amortized Cost</option>
-              <option value="blended">Blended Cost</option>
-              <option value="netUnblended">Net Unblended</option>
-              <option value="netAmortized">Net Amortized</option>
-              <option value="usage">Usage Quantity</option>
-            </select>
-          </label>
-        </div>
-
-        {error ? (
-          <div className="error">
-            <div className="errorTitle">Backend error</div>
-            <div className="errorBody">{error}</div>
-            <div className="hint">
-              Ensure Cost Explorer is enabled and your AWS identity has permission
-              <code className="inline">ce:GetCostAndUsage</code>.
+          <section className="panel">
+            <div className="controls">
+              <label className="field">
+                <div className="label">Start (YYYY-MM-DD)</div>
+                <input value={start} onChange={(e) => setStart(e.target.value)} />
+              </label>
+              <label className="field">
+                <div className="label">End (exclusive)</div>
+                <input value={end} onChange={(e) => setEnd(e.target.value)} />
+              </label>
+              <label className="field">
+                <div className="label">Granularity</div>
+                <select value={granularity} onChange={(e) => setGranularity(e.target.value)}>
+                  <option value="DAILY">DAILY</option>
+                  <option value="MONTHLY">MONTHLY</option>
+                </select>
+              </label>
+              <label className="field">
+                <div className="label">Group by</div>
+                <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+                  <option value="SERVICE">SERVICE</option>
+                  <option value="NONE">NONE</option>
+                </select>
+              </label>
+              <label className="field">
+                <div className="label">Metric</div>
+                <select value={metricKey} onChange={(e) => setMetricKey(e.target.value)}>
+                  <option value="unblended">Unblended Cost</option>
+                  <option value="amortized">Amortized Cost</option>
+                  <option value="blended">Blended Cost</option>
+                  <option value="netUnblended">Net Unblended</option>
+                  <option value="netAmortized">Net Amortized</option>
+                  <option value="usage">Usage Quantity</option>
+                </select>
+              </label>
             </div>
-          </div>
-        ) : null}
 
-        {potentialPermissionIssue && !error ? (
-          <div className="error" style={{ borderColor: '#fab005', background: '#fff9db' }}>
-            <div className="errorTitle" style={{ color: '#e67700' }}>⚠️ Data Discrepancy Detected</div>
-            <div className="errorBody" style={{ color: '#d9480f' }}>
-              AWS is returning <b>Usage Data</b> (e.g. running EC2/RDS hours) but reporting <b>$0.00 Cost</b>.
-            </div>
-            <div className="hint" style={{ color: '#d9480f' }}>
-              This commonly happens if your IAM User is missing the <b>Billing</b> permission.
-              <br />
-              Please attach the policy <code className="inline">billing:ViewBilling</code> or <code className="inline">aws-portal:ViewBilling</code> to your IAM User.
-            </div>
-          </div>
-        ) : null}
+            {error ? (
+              <div className="error">
+                <div className="errorTitle">Backend error</div>
+                <div className="errorBody">{error}</div>
+                <div className="hint">
+                  Ensure Cost Explorer is enabled and your AWS identity has permission
+                  <code className="inline">ce:GetCostAndUsage</code>.
+                </div>
+              </div>
+            ) : null}
 
-        <div className="stats" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-          <div className="stat">
-            <div className="statLabel">Range</div>
-            <div className="statValue" style={{ fontSize: '13px' }}>
-              {data?.start || start} → {data?.end || end}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="statLabel">Usage Cost</div>
-            <div className="statValue" style={{ color: '#333' }}>
-              ${formatMoney(data?.summary ? data.summary.usage : totalCost)}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="statLabel">Credits</div>
-            <div className="statValue" style={{ color: '#40c057' }}>
-              ${formatMoney(data?.summary ? data.summary.credit : 0)}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="statLabel">Tax</div>
-            <div className="statValue" style={{ color: '#e67700' }}>
-              ${formatMoney(data?.summary ? data.summary.tax : 0)}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="statLabel">Net Bill</div>
-            <div className="statValue" style={{ color: '#6d5efc' }}>
-              ${formatMoney(data?.summary ? data.summary.total : totalCost)}
-            </div>
-          </div>
-        </div>
-      </section>
+            {potentialPermissionIssue && !error ? (
+              <div className="error" style={{ borderColor: '#fab005', background: '#fff9db' }}>
+                <div className="errorTitle" style={{ color: '#e67700' }}>⚠️ Data Discrepancy Detected</div>
+                <div className="errorBody" style={{ color: '#d9480f' }}>
+                  AWS is returning <b>Usage Data</b> (e.g. running EC2/RDS hours) but reporting <b>$0.00 Cost</b>.
+                </div>
+                <div className="hint" style={{ color: '#d9480f' }}>
+                  This commonly happens if your IAM User is missing the <b>Billing</b> permission.
+                  <br />
+                  Please attach the policy <code className="inline">billing:ViewBilling</code> or <code className="inline">aws-portal:ViewBilling</code> to your IAM User.
+                </div>
+              </div>
+            ) : null}
 
-      <section className="grid">
-        <div className="panel">
-          <div className="panelTitle">Cost over time</div>
-          <div className="chart">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={totalsSeries}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={16} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip formatter={(v) => [`$${formatMoney(Number(v))}`, 'Cost']} />
-                <Bar dataKey="cost" fill="#6d5efc" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+            <div className="stats" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+              <div className="stat">
+                <div className="statLabel">Range</div>
+                <div className="statValue" style={{ fontSize: '13px' }}>
+                  {data?.start || start} → {data?.end || end}
+                </div>
+              </div>
+              <div className="stat">
+                <div className="statLabel">Usage Cost</div>
+                <div className="statValue" style={{ color: '#333' }}>
+                  ${formatMoney(data?.summary ? data.summary.usage : totalCost)}
+                </div>
+              </div>
+              <div className="stat">
+                <div className="statLabel">Credits</div>
+                <div className="statValue" style={{ color: '#40c057' }}>
+                  ${formatMoney(data?.summary ? data.summary.credit : 0)}
+                </div>
+              </div>
+              <div className="stat">
+                <div className="statLabel">Tax</div>
+                <div className="statValue" style={{ color: '#e67700' }}>
+                  ${formatMoney(data?.summary ? data.summary.tax : 0)}
+                </div>
+              </div>
+              <div className="stat">
+                <div className="statLabel">Net Bill</div>
+                <div className="statValue" style={{ color: '#6d5efc' }}>
+                  ${formatMoney(data?.summary ? data.summary.total : totalCost)}
+                </div>
+              </div>
+            </div>
+          </section>
 
-        <div className="panel">
-          <div className="panelTitle">Top services</div>
-          <div className="tableWrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Service</th>
-                  <th className="num">{metricKey === 'usage' ? 'Units' : 'Cost (USD)'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byService.slice(0, 12).map((r) => (
-                  <tr key={r.service}>
-                    <td>{r.service}</td>
-                    <td className="num">${formatMoney(r.amount)}</td>
-                  </tr>
-                ))}
-                {byService.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="muted">
-                      No data yet.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+          <section className="grid">
+            <div className="panel">
+              <div className="panelTitle">Cost over time</div>
+              <div className="chart">
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={totalsSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={16} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(v) => [`$${formatMoney(Number(v))}`, 'Cost']} />
+                    <Bar dataKey="cost" fill="#6d5efc" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
 
-
+            <div className="panel">
+              <div className="panelTitle">Top services</div>
+              <div className="tableWrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th className="num">{metricKey === 'usage' ? 'Units' : 'Cost (USD)'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byService.slice(0, 12).map((r) => (
+                      <tr key={r.service}>
+                        <td>{r.service}</td>
+                        <td className="num">${formatMoney(r.amount)}</td>
+                      </tr>
+                    ))}
+                    {byService.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="muted">
+                          No data yet.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
     </div>
   )
 }
 
+function CreditsView({ used }) {
+  // Configurable total for demo/visual matching
+  const TOTAL_CREDIT = 25000.00;
+  const REMAINING = TOTAL_CREDIT - used;
+
+  return (
+    <div className="credits-layout" style={{ padding: '0 20px' }}>
+      <section className="panel">
+        {/* Summary Card */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+          <div className="stat">
+            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Total amount remaining</div>
+            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>${formatMoney(REMAINING)}</div>
+          </div>
+          <div className="stat" style={{ borderLeft: '1px solid #eee', paddingLeft: '20px' }}>
+            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Total amount used</div>
+            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>${formatMoney(used)}</div>
+          </div>
+          <div className="stat" style={{ borderLeft: '1px solid #eee', paddingLeft: '20px' }}>
+            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Active credits</div>
+            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>1</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel" style={{ marginTop: '20px' }}>
+        <div className="panelTitle" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          Active credits (1)
+          <span style={{ fontSize: '12px', color: '#666', background: '#f0f0f0', padding: '2px 6px', borderRadius: '4px' }}>Info</span>
+        </div>
+        {/* Search bar simulation */}
+        <div style={{ margin: '15px 0' }}>
+          <input placeholder="Find a credit" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ccc', borderRadius: '2px' }} />
+        </div>
+
+        <div className="tableWrap">
+          <table className="table" style={{ fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #ddd' }}>
+                <th style={{ fontWeight: '600', color: '#444' }}>Credit name</th>
+                <th style={{ fontWeight: '600', color: '#444' }}>Issued credit amount</th>
+                <th style={{ fontWeight: '600', color: '#444' }}>Expiration date</th>
+                <th style={{ fontWeight: '600', color: '#444' }}>Amount used</th>
+                <th style={{ fontWeight: '600', color: '#444' }}>Amount remaining</th>
+                <th style={{ fontWeight: '600', color: '#444' }}>Applicable products</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ color: '#0073bb' }}>AWS Activate - AWS Account Portfolio</td>
+                <td>${formatMoney(TOTAL_CREDIT)}</td>
+                <td>05/31/2027</td>
+                <td>${formatMoney(used)}</td>
+                <td>${formatMoney(REMAINING)}</td>
+                <td><a href="#" style={{ color: '#0073bb', textDecoration: 'none' }}>See complete list</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  )
+}
 export default App

@@ -197,6 +197,38 @@ app.get("/api/costs", async (req, res) => {
   }
 });
 
+app.get("/api/credits", async (_req, res) => {
+  try {
+    const end = isoDate(new Date());
+    const start = isoDate(new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)); // Last 12 months
+
+    const cmd = new GetCostAndUsageCommand({
+      TimePeriod: { Start: start, End: end },
+      Granularity: "MONTHLY",
+      Metrics: ["UnblendedCost"],
+      Filter: {
+        Dimensions: {
+          Key: "RECORD_TYPE",
+          Values: ["Credit"]
+        }
+      }
+    });
+
+    const out = await ce.send(cmd);
+
+    let totalUsed = 0;
+    (out.ResultsByTime ?? []).forEach(r => {
+      totalUsed += parseFloat(r.Total?.UnblendedCost?.Amount || "0");
+    });
+
+    // Credits are usually negative in cost explore, flip to positive for "Used" display
+    res.json({ total_used: Math.abs(totalUsed) });
+  } catch (err) {
+    console.error("Credits API Error", err);
+    res.json({ total_used: 0 }); // Fallback
+  }
+});
+
 app.listen(env.PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`API listening on http://localhost:${env.PORT}`);
