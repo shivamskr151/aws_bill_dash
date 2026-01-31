@@ -219,21 +219,35 @@ app.get("/api/credits", async (_req, res) => {
           Key: "RECORD_TYPE",
           Values: ["Credit"]
         }
-      }
+      },
+      GroupBy: [{ Type: "DIMENSION", Key: "SERVICE" }]
     });
 
     const out = await ce.send(cmd);
 
     let totalUsed = 0;
+    const serviceMap = new Map();
+
     (out.ResultsByTime ?? []).forEach(r => {
-      totalUsed += parseFloat(r.Total?.UnblendedCost?.Amount || "0");
+      (r.Groups ?? []).forEach(g => {
+        const service = g.Keys?.[0] || "Unknown";
+        const amount = parseFloat(g.Metrics?.UnblendedCost?.Amount || "0");
+        totalUsed += amount;
+        serviceMap.set(service, (serviceMap.get(service) || 0) + amount);
+      });
     });
 
-    // Credits are usually negative in cost explore, flip to positive for "Used" display
-    res.json({ total_used: Math.abs(totalUsed) });
+    const by_service = [...serviceMap.entries()]
+      .map(([service, amount]) => ({ service, amount: Math.abs(amount) }))
+      .sort((a, b) => b.amount - a.amount);
+
+    res.json({
+      total_used: Math.abs(totalUsed),
+      by_service
+    });
   } catch (err) {
     console.error("Credits API Error", err);
-    res.json({ total_used: 0 }); // Fallback
+    res.json({ total_used: 0, by_service: [] }); // Fallback
   }
 });
 
@@ -241,4 +255,3 @@ app.listen(env.PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`API listening on http://localhost:${env.PORT}`);
 });
-

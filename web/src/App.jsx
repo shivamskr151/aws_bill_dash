@@ -140,10 +140,13 @@ function App() {
   }, [data])
 
   const [view, setView] = useState('DASHBOARD'); // 'DASHBOARD' or 'CREDITS'
-  const [creditUsage, setCreditUsage] = useState(0);
+  const [creditData, setCreditData] = useState({ total_used: 0, by_service: [] });
 
   useEffect(() => {
-    fetch('/api/credits').then(r => r.json()).then(d => setCreditUsage(d.total_used)).catch(console.error);
+    fetch('/api/credits')
+      .then(r => r.json())
+      .then(d => setCreditData(d))
+      .catch(console.error);
   }, []);
 
   return (
@@ -173,7 +176,7 @@ function App() {
       </header>
 
       {view === 'CREDITS' ? (
-        <CreditsView used={creditUsage} />
+        <CreditsView data={creditData} />
       ) : (
         <>
           <section className="presets" style={{ display: 'flex', gap: '8px', padding: '0 20px', marginBottom: '10px' }}>
@@ -358,62 +361,51 @@ function App() {
   )
 }
 
-function CreditsView({ used }) {
-  // Configurable total for demo/visual matching
-  const TOTAL_CREDIT = 25000.00;
-  const REMAINING = TOTAL_CREDIT - used;
+function CreditsView({ data }) {
+  const { total_used, by_service } = data;
 
   return (
     <div className="credits-layout" style={{ padding: '0 20px' }}>
       <section className="panel">
-        {/* Summary Card */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           <div className="stat">
-            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Total amount remaining</div>
-            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>${formatMoney(REMAINING)}</div>
+            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Total Credits Applied (Last 12m)</div>
+            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>${formatMoney(total_used)}</div>
           </div>
           <div className="stat" style={{ borderLeft: '1px solid #eee', paddingLeft: '20px' }}>
-            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Total amount used</div>
-            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>${formatMoney(used)}</div>
-          </div>
-          <div className="stat" style={{ borderLeft: '1px solid #eee', paddingLeft: '20px' }}>
-            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Active credits</div>
-            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>1</div>
+            <div style={{ fontSize: '14px', color: '#555', marginBottom: '8px' }}>Services Covered</div>
+            <div style={{ fontSize: '32px', fontWeight: '400', color: '#16191f' }}>{by_service?.length || 0}</div>
           </div>
         </div>
       </section>
 
       <section className="panel" style={{ marginTop: '20px' }}>
-        <div className="panelTitle" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          Active credits (1)
-          <span style={{ fontSize: '12px', color: '#666', background: '#f0f0f0', padding: '2px 6px', borderRadius: '4px' }}>Info</span>
+        <div className="panelTitle">
+          Real-time Credit Usage Breakdown
         </div>
-        {/* Search bar simulation */}
-        <div style={{ margin: '15px 0' }}>
-          <input placeholder="Find a credit" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ccc', borderRadius: '2px' }} />
-        </div>
-
         <div className="tableWrap">
-          <table className="table" style={{ fontSize: '13px' }}>
+          <table className="table">
             <thead>
-              <tr style={{ borderBottom: '2px solid #ddd' }}>
-                <th style={{ fontWeight: '600', color: '#444' }}>Credit name</th>
-                <th style={{ fontWeight: '600', color: '#444' }}>Issued credit amount</th>
-                <th style={{ fontWeight: '600', color: '#444' }}>Expiration date</th>
-                <th style={{ fontWeight: '600', color: '#444' }}>Amount used</th>
-                <th style={{ fontWeight: '600', color: '#444' }}>Amount remaining</th>
-                <th style={{ fontWeight: '600', color: '#444' }}>Applicable products</th>
+              <tr>
+                <th>Service</th>
+                <th className="num">Credits Applied</th>
+                <th className="num">% of Total</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td style={{ color: '#0073bb' }}>AWS Activate - AWS Account Portfolio</td>
-                <td>${formatMoney(TOTAL_CREDIT)}</td>
-                <td>05/31/2027</td>
-                <td>${formatMoney(used)}</td>
-                <td>${formatMoney(REMAINING)}</td>
-                <td><a href="#" style={{ color: '#0073bb', textDecoration: 'none' }}>See complete list</a></td>
-              </tr>
+              {by_service && by_service.length > 0 ? (
+                by_service.map((s) => (
+                  <tr key={s.service}>
+                    <td style={{ color: '#0073bb' }}>{s.service}</td>
+                    <td className="num">${formatMoney(s.amount)}</td>
+                    <td className="num">
+                      {total_used > 0 ? ((s.amount / total_used) * 100).toFixed(1) : '0.0'}%
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td colSpan={3} className="muted">No credit usage found in the last 12 months.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
