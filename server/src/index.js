@@ -97,6 +97,14 @@ app.get("/api/costs", async (req, res) => {
         "NetAmortizedCost"
       ],
       GroupBy: groupBy,
+      Filter: {
+        Not: {
+          Dimensions: {
+            Key: "RECORD_TYPE",
+            Values: ["Credit", "Refund"]
+          }
+        }
+      },
     });
 
     // Parallel request: Fetch breakdown by RECORD_TYPE (Credits, Tax, Usage, etc.)
